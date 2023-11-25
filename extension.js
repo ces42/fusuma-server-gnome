@@ -336,13 +336,6 @@ export default class FusumaServerExtension {
    //          // }
    //      });
 
-        Main.layoutManager.connectObject(
-			// TODO what's this?
-            'system-modal-opened', () => {
-                send(`system-modal\t${global.stage.get_title()}\n`);
-            },
-            this
-        );
     }
 
     disable() {
