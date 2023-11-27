@@ -11,17 +11,23 @@ const stdinDecoder = new TextDecoder('utf-8');
 
 const log = console.log;
 
-let FUNS = new Set([]);
+let FUNS = {};
 ['three', 'four'].forEach(num => {
-		['up', 'down', 'left', 'right', 'begin', 'end'].forEach(dir => {
-				FUNS.add(`${num}_finger_${dir}`)
-			});
+	['up', 'down', 'left', 'right', 'begin', 'end'].forEach(dir => {
+		const name = `${num}_finger_${dir}`;
+		if (this[name]) {
+			FUNS[name] = this[name];
+		}
 	});
+});
 ['two', 'three', 'four'].forEach(num => {
-		['in', 'out'].forEach(dir => {
-				FUNS.add(`pinch_${num}_${dir}`);
-			});
+	['in', 'out'].forEach(dir => {
+		const name = `pinch_${num}_${dir}`;
+		if (this[name]) {
+			FUNS[name] = this[name];
+		}
 	});
+});
 
 function findPointerWindow() {
     let target = null;
@@ -541,10 +547,10 @@ function line_reader(dis, res) {
 };
 
 function handle_input(cmd) {
-	if (FUNS.has(cmd)) {
+	if (cmd in FUNS) {
 		print('executing!');
 		try {
-			eval(cmd + '()');
+			FUNS[cmd]();
 		} catch (e) {
 			console.error(e, e.stack);
 		}
