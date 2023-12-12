@@ -11,27 +11,10 @@ const stdinDecoder = new TextDecoder('utf-8');
 
 const log = console.log;
 
-let FUNS = {};
-['three', 'four'].forEach(num => {
-	['up', 'down', 'left', 'right', 'begin', 'end'].forEach(dir => {
-		const name = `${num}_finger_${dir}`;
-		if (this[name]) {
-			FUNS[name] = this[name];
-		}
-	});
-});
-['two', 'three', 'four'].forEach(num => {
-	['in', 'out'].forEach(dir => {
-		const name = `pinch_${num}_${dir}`;
-		if (this[name]) {
-			FUNS[name] = this[name];
-		}
-	});
-});
 
 function findPointerWindow() {
     let target = null;
-    let [pointerX, pointerY, pointerZ] = global.get_pointer();
+    let [pointerX, pointerY, ] = global.get_pointer();
     let currActor = global.stage.get_actor_at_pos(
         Clutter.PickMode.REACTIVE, pointerX, pointerY
     );
@@ -52,24 +35,18 @@ function findPointerWindow() {
     return target;
 }
 
-// function pressKey(combination) {
-// 	combination.forEach(key => _virtualKeyboard.notify_keyval(
-// 		Clutter.get_current_event_time(), key, Clutter.KeyState.PRESSED)
-// 	);
-// 	combination.reverse().forEach(key =>
-// 		_virtualKeyboard.notify_keyval(
-// 			Clutter.get_current_event_time(), key, Clutter.KeyState.RELEASED
-// 	));
-// }
-
 function pressKey(combination) {
 	// if (typeof combination === 'string') {
 	// 	combination = [combination];
 	// }
 	log('pressing ' + combination.join('+'))
-	combination.forEach(key => _virtualKeyboard.notify_keyval(
-		Clutter.get_current_event_time(), Clutter[`KEY_${key}`], Clutter.KeyState.PRESSED)
-	);
+	combination.forEach(key => {
+		const KEY = Clutter[`KEY_${key}`];
+		if (!KEY) log(`unknow key "${KEY}"`)
+		_virtualKeyboard.notify_keyval(
+			Clutter.get_current_event_time(), KEY, Clutter.KeyState.PRESSED
+		)
+	});
 	combination.reverse().forEach(key =>
 		_virtualKeyboard.notify_keyval(
 			Clutter.get_current_event_time(), Clutter[`KEY_${key}`], Clutter.KeyState.RELEASED
@@ -80,14 +57,22 @@ let pressed = new Set([]);
 
 function keyDown(key) {
 	log(`keydown ${key}`)
-	_virtualKeyboard.notify_keyval(Clutter.get_current_event_time(), Clutter[`KEY_${key}`], Clutter.KeyState.PRESSED);
+	_virtualKeyboard.notify_keyval(
+		Clutter.get_current_event_time(),
+		Clutter[`KEY_${key}`],
+		Clutter.KeyState.PRESSED
+	);
 	pressed.add(key);
 }
 
 function keyUp(key) {
 	if (pressed.delete(key)) {
 		log(`keyup ${key}`)
-		_virtualKeyboard.notify_keyval(Clutter.get_current_event_time(), Clutter[`KEY_${key}`], Clutter.KeyState.RELEASED);
+		_virtualKeyboard.notify_keyval(
+			Clutter.get_current_event_time(),
+			Clutter[`KEY_${key}`],
+			Clutter.KeyState.RELEASED
+		);
 		return;
 	} else {
 		log(`keyUp(${key}) called, but ${key} is not down, ignoring`);
@@ -98,6 +83,10 @@ function maximizeWin(win) {
 	win.maximize(Meta.MaximizeFlags.BOTH);
 }
 
+function shiftPressed() {
+    return global.get_pointer()[2] & Clutter.ModifierType.SHIFT_MASK;
+}
+
 function _changeWS_kb(move) {
 	if (move == -1) {
 		pressKey(['Super_L', 'Prior']);
@@ -106,42 +95,47 @@ function _changeWS_kb(move) {
 	}
 }
 
-function _changeWS_gnome(move) { // int move is how much to move by
-	// code from https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/windowManager.js
+class DummyKeyBinding {
+	constructor(name) {
+		this.name = name;
+	}
 
-	const workspaceManager = global.display.get_workspace_manager();
-	let target = workspaceManager.get_active_workspace_index() + move;
-	const num = workspaceManager.n_workspaces;
-	target = Math.max(0, Math.min(num, target)); // target = clip(target, 0, num)
-	let newWs = workspaceManager.get_workspace_by_index(target);
-
-	Main.wm.actionMoveWorkspace(newWs); // do the actual changing
-
-	// show osd notification of change
-	if (!Main.overview.visible) {
-		if (Main.wm._workspaceSwitcherPopup == null) {
-			Main.wm._workspaceTracker.blockUpdates();
-			Main.wm._workspaceSwitcherPopup = new WorkspaceSwitcherPopup.WorkspaceSwitcherPopup();
-			Main.wm._workspaceSwitcherPopup.connect('destroy', () => {
-				Main.wm._workspaceTracker.unblockUpdates();
-				Main.wm._workspaceSwitcherPopup = null;
-				Main.wm._isWorkspacePrepended = false;
-			});
-		}
-		Main.wm._workspaceSwitcherPopup.display(newWs.index());
-		// (Main.wm._workspaceSwitcherPopup || new WorkspaceSwitcherPopup.WorkspaceSwitcherPopup()).display(newWs.index());
+	get_name() {
+		return this.name;
 	}
 }
 
-function changeWS(move) {
-	Main.panel.statusArea.quickSettings.menu.close();
-	Main.panel.statusArea.dateMenu.menu.close();
-	_changeWS_kb(move);
+function _changeWS_gnome(move, move_win) { // int move is how much to move by
+	// calling https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/main/js/ui/windowManager.js
+
+	let dir;
+	if (move == 1) {
+		dir = 'right';
+	} else if (move == -1) {
+		dir = 'left';
+	} else {
+		log(`don't understand argument ${move} to _changeWS_gnome`)
+		return
+	}
+	let action = 'switch'
+	if (move_win) {
+		action = 'move'
+	}
+	Main.wm._showWorkspaceSwitcher(
+		global.display, active_win, new DummyKeyBinding(`${action}---${dir}`)
+	);
+}
+
+function changeWS(move, move_win) {
+	if (move_win === undefined) {
+		move_win = shiftPressed()
+	}
+	_changeWS_gnome(move, move_win);
 }
 
 let active_win;
 let restore_win;
-let needs_raise = false;
+// let needs_raise = false;
 
 function getWindow() {
 	restore_win = global.display.get_focus_window();
@@ -150,7 +144,7 @@ function getWindow() {
 	} else {
 		active_win = findPointerWindow() || restore_win;
 	}
-	needs_raise = false; // defensive
+	// needs_raise = false; // defensive
 }
 
 function doFocusing() {
@@ -160,16 +154,19 @@ function doFocusing() {
 }
 
 function switchWinBack() {
-	log(`switching back to ${restore_win?.get_wm_class()}${needs_raise ? ' and raising' : ''}`)
-	log(`current active window: ${global.display.get_focus_window()?.get_wm_class()}`)
-	if (restore_win == null) return;
+	// log(`switching back to ${restore_win?.get_wm_class()}${needs_raise ? ' and raising' : ''}`)
+	const current_win = global.display.get_focus_window()?.get_wm_class()
+	if (restore_win == null || restore_win == current_win) return;
 
+	log(`switching back to ${restore_win?.get_wm_class()} from ${current_win}`)
 	restore_win.focus(Meta.CURRENT_TIME);
-	if (needs_raise) {
-		restore_win.raise();
-	}
+	restore_win.activate(Meta.CURRENT_TIME);
+	// restore_win.activate(Meta.CURRENT_TIME);
+	// if (needs_raise) {
+	// 	restore_win.raise();
+	// }
 	active_win = restore_win = null;
-	needs_raise = false;
+	// needs_raise = false;
 }
 
 function get_wmclass() {
@@ -182,196 +179,35 @@ function get_title() {
 
 
 function three_finger_begin() {
-	getWindow();
-	doFocusing();
+	if (Date.now() - hold_time < 1000) {
+		wm_mode = true;
+	} else { // four_finger_hold already takes care of this
+		getWindow();
+		doFocusing();
+	}
 }
 
-let evince_switcher_active = false;
-
-async function three_finger_end() {
-	if (evince_switcher_active) {
-		keyUp('Alt_L');
-		evince_switcher_active = false;
-		// if (restore_win.get_wm_class() != "Evince") {
-		// 	needs_raise = true;
-		// }
+function three_finger_end() {
+	if (wm_mode) {
+		wm_mode = false; // not switching back
+	}
+	if (esp) {
+		evinceTabFinish();
 		if (restore_win.get_wm_class() == "Evince") {
 			active_win = restore_win = null
 			return;
 		}
-		needs_raise = true;
+		// needs_raise = true;
+		switchWinBack();
 
 		// we need to wait for the alt-tab switch to take effect before we switch back
-        const handler = tracker.connect('notify::focus-app', () => {
-			switchWinBack();
-			tracker.disconnect(handler);
-		});
+        // const handler = tracker.connect('notify::focus-app', () => {
+		//	switchWinBack();
+		// 	tracker.disconnect(handler);
+		// });
 	} else {
 		switchWinBack();
 	}
-}
-
-function three_finger_right() {
-	switch (get_wmclass()) {
-		case "Spotify":
-			// ydotool()
-			pressKey(['AudioNext']);
-			break;
-		case "Evince":
-			if (!evince_switcher_active) {
-				Main.panel.statusArea.quickSettings.menu.close();
-				Main.panel.statusArea.dateMenu.menu.close();
-				keyDown('Alt_L');
-				pressKey(['Shift_L', 'grave']);
-				evince_switcher_active = true;
-			} else {
-				pressKey(['Left']);
-			}
-			break;
-		case "gnome-calendar":
-			pressKey(['Prior']);
-			break;
-		default:
-			pressKey(['Control_L', 'Prior']);
-			break;
-	}
-}
-
-function three_finger_left() {
-	switch (get_wmclass()) {
-		case "Spotify":
-			// ydotool()
-			pressKey(['AudioPrev']);
-			break;
-		case "Evince":
-			if (!evince_switcher_active) {
-				Main.panel.statusArea.quickSettings.menu.close();
-				Main.panel.statusArea.dateMenu.menu.close();
-				keyDown('Alt_L');
-				evince_switcher_active = true;
-			}
-			pressKey(['grave']);
-			break;
-		case "gnome-calendar":
-			pressKey(['Next']);
-			break;
-		default:
-			pressKey(['Control_L', 'Next']);
-			break;
-	}
-}
-
-function three_finger_up() {
-	switch (get_wmclass()) {
-		case "Tilix":
-		case "Guake":
-			pressKey(['Control_L', 'W']);
-			break;
-		case "firefox":
-		case "firefox-aurora":
-		case "Tor Browser":
-		case "Chromium-browser":
-			pressKey(['Control_L', 'F4']);
-			break;
-		case "kitty":
-			const title = get_title();
-			if (title.startsWith('vi:') || title === "Clicked command output") {
-				pressKey(['Escape']);
-				// keyDown('Shift_L');
-				pressKey(['Z']);
-				pressKey(['Q']);
-				// keyUp('Shift_L');
-			} else if (/^(man |run-help |mpv:|mpa:).*/.test(title)) {
-				pressKey(['q']);
-			} else {
-				pressKey(['Control_L', 'F4']);
-			}
-			break;
-		case "Evince":
-			if (evince_switcher_active) {
-				pressKey(['W']);
-			} else {
-				pressKey(['Alt_L', 'F4']);
-			}
-			break;
-		default:
-			pressKey(['Control_L', 'w']);
-			break;
-	}
-}
-
-let ff_newtab = -1;
-
-function three_finger_down() {
-	switch (get_wmclass()) {
-		case "Tilix":
-		case "Guake":
-		case "kitty":
-			pressKey(['Control_L', 'T']);
-			restore_win = active_win;
-			break;
-		case "TeXstudio":
-			pressKey(['Control_L', 'n']);
-			restore_win = active_win;
-			break;
-		case "firefox":
-		case "firefox-aurora":
-		case "Tor Browser":
-		case "Chromium-browser":
-			if (ff_newtab >= 0 && Date.now() - ff_newtab < 800) {
-				pressKey(['Control_L', 'F4']);
-				pressKey(['Control_L', 'T']);
-				ff_newtab = -1;
-			} else {
-				pressKey(['Control_L', 't']);
-				ff_newtab=Date.now();
-			}
-			restore_win = active_win;
-			break;
-		case "Evince":
-			maximizeWin(active_win);
-			break;
-		default:
-			pressKey(['Control_L', 'T']);
-			break;
-	}
-	restore_win = active_win;
-	needs_raise = true;
-}
-
-
-let wm_mode = false;
-let wm_mode_tiling = false;
-let hold_time = -1;
-let switcher_active = false;
-
-function four_finger_hold() {
-	hold_time = Date.now();
-	Main.notify('fusuma server', 'window manager mode');
-	getWindow();
-	doFocusing();
-}
-
-function four_finger_begin() {
-	if (Date.now() - hold_time < 1000) {
-		wm_mode = true;
-		wm_mode_tiling = false;
-	} else {
-		altTabBegin();
-	}
-}
-
-function four_finger_end() {
-	if (wm_mode_tiling) {
-		pressKey(['Enter']);
-	} else if (wm_mode) {
-		switchWinBack();
-	} else {
-		altTabFinish();
-	}
-	wm_mode = wm_mode_tiling = false;
-	hold_time = -1;
-
 }
 
 let wsp = null;
@@ -420,9 +256,227 @@ function altTabFinish() {
 	}
 }
 
+let esp = null;
+function evinceTab(move) {
+	// if (move == 1) {
+	// 	if (!evince_switcher_active) {
+	// 		Main.panel.statusArea.quickSettings.menu.close();
+	// 		Main.panel.statusArea.dateMenu.menu.close();
+	// 		keyDown('Alt_L');
+	// 		pressKey(['Shift_L', 'grave']);
+	// 		evince_switcher_active = true;
+	// 	} else {
+	// 		pressKey(['Left']);
+	// 	}
+	// } else if (move == -1) {
+	// 	if (!evince_switcher_active) {
+	// 		Main.panel.statusArea.quickSettings.menu.close();
+	// 		Main.panel.statusArea.dateMenu.menu.close();
+	// 		keyDown('Alt_L');
+	// 		evince_switcher_active = true;
+	// 	}
+	// 	pressKey(['grave']);
+	// }
+	if (!esp) {
+		esp = new AltTab.WindowSwitcherPopup();
+		let evince = tracker.get_window_app(active_win);
+		esp._singleApp = [evince.get_id(), evince.get_name()];
+		esp.show();
+		if (move == -1) {
+			esp._select(esp._items.length - 1);
+		}
+	} else {
+		if (move == 1) {
+			esp._select(esp._next());
+		}
+		else if (move == -1) {
+			esp._select(esp._previous());
+		}
+	}
+}
+
+function evinceTabFinish() {
+	// keyUp('Alt_L');
+	// switcher_active = false
+	if (esp) {
+		esp._finish();
+		// esp.destroy(); //_finish() already destroys
+		esp = null;
+	}
+}
+
+
+function three_finger_right() {
+	switch (get_wmclass()) {
+		case "Spotify":
+			// ydotool()
+			pressKey(['AudioNext']);
+			break;
+		case "Evince":
+			evinceTab(-1);
+			break;
+		case "gnome-calendar":
+			pressKey(['Prior']);
+			break;
+		default:
+			pressKey(['Control_L', 'Prior']);
+			break;
+	}
+}
+
+function three_finger_left() {
+	switch (get_wmclass()) {
+		case "Spotify":
+			// ydotool()
+			pressKey(['AudioPrev']);
+			break;
+		case "Evince":
+			evinceTab(1);
+			break;
+		case "gnome-calendar":
+			pressKey(['Next']);
+			break;
+		default:
+			pressKey(['Control_L', 'Next']);
+			break;
+	}
+}
+
+function three_finger_up() {
+	log(wm_mode);
+	if (wm_mode) {
+		pressKey(['Super_L', 'Shift_L', 'Up']);
+		return;
+	}
+	switch (get_wmclass()) {
+		case "Tilix":
+		case "Guake":
+			pressKey(['Control_L', 'W']);
+			break;
+		case "firefox":
+		case "firefox-aurora":
+		case "Tor Browser":
+		case "Chromium-browser":
+			pressKey(['Control_L', 'F4']);
+			break;
+		case "kitty":
+			const title = get_title();
+			if (title.startsWith('vi:') || title === "Clicked command output") {
+				pressKey(['Escape']);
+				// keyDown('Shift_L');
+				pressKey(['Z']);
+				pressKey(['Q']);
+				// keyUp('Shift_L');
+			} else if (/^(man |run-help |mpv:|mpa:|h?top).*/.test(title)) {
+				pressKey(['q']);
+			} else {
+				pressKey(['Control_L', 'F4']);
+			}
+			break;
+		case "Evince":
+			if (esp) {
+				pressKey(['W']);
+			} else {
+				pressKey(['Alt_L', 'F4']);
+			}
+			break;
+		default:
+			pressKey(['Control_L', 'w']);
+			break;
+	}
+}
+
+let ff_newtab = -1;
+
+function three_finger_down() {
+	log(wm_mode);
+	if (wm_mode) {
+		pressKey(['Super_L', 'Shift_L', 'Down']);
+		return;
+	}
+	switch (get_wmclass()) {
+		case "Tilix":
+		case "Guake":
+		case "kitty":
+			pressKey(['Control_L', 'T']);
+			restore_win = active_win;
+			break;
+		case "TeXstudio":
+			pressKey(['Control_L', 'n']);
+			restore_win = active_win;
+			break;
+		case "firefox":
+		case "firefox-aurora":
+		case "Tor Browser":
+		case "Chromium-browser":
+			if (ff_newtab >= 0 && Date.now() - ff_newtab < 800) {
+				pressKey(['Control_L', 'F4']);
+				pressKey(['Control_L', 'T']);
+				ff_newtab = -1;
+			} else {
+				pressKey(['Control_L', 't']);
+				ff_newtab=Date.now();
+			}
+			restore_win = active_win;
+			break;
+		case "Evince":
+			maximizeWin(active_win);
+			break;
+		default:
+			pressKey(['Control_L', 'T']);
+			break;
+	}
+	restore_win = active_win;
+	// needs_raise = true;
+}
+
+function notify_wm_mode() {
+	Main.osdWindowManager.show(
+		-1, Gio.icon_new_for_string('view-grid-symbolic'), null, null, null
+	)
+}
+
+let wm_mode = false;
+let wm_mode_tiling = false;
+let hold_time = -1;
+
+function four_finger_hold() {
+	hold_time = Date.now();
+	// Main.notify('fusuma server', 'window manager mode');
+	notify_wm_mode();
+	getWindow();
+	doFocusing();
+}
+
+function four_finger_begin() {
+	if (Date.now() - hold_time < 1000) {
+		wm_mode = true;
+		wm_mode_tiling = false;
+	} else {
+		altTabBegin();
+	}
+}
+
+function four_finger_end() {
+	if (wm_mode_tiling) {
+		pressKey(['Return']);
+	} else if (wm_mode) {
+		switchWinBack();
+	} else {
+		altTabFinish();
+	}
+	wm_mode = wm_mode_tiling = false;
+	hold_time = -1;
+
+}
+
 function four_finger_left() {
 	if (wm_mode) {
-
+		pressKey(['Super_L', 'Left']);
+		wm_mode = false;
+		wm_mode_tiling = true;
+	} else if (wm_mode_tiling) {
+		pressKey(['Right']);
 	} else {
 		altTab(1);
 		// if (!wsp) {
@@ -436,7 +490,11 @@ function four_finger_left() {
 
 function four_finger_right() {
 	if (wm_mode) {
-
+		pressKey(['Super_L', 'Right']);
+		wm_mode = false;
+		wm_mode_tiling = true;
+	} else if (wm_mode_tiling) {
+		pressKey(['Left']);
 	} else {
 		altTab(-1);
 	}
@@ -444,11 +502,14 @@ function four_finger_right() {
 
 function four_finger_down() {
 	if (wm_mode) {
-
+		getWindow();
+		changeWS(-1, true);
+	} else if (wm_mode_tiling) {
 	} else {
 		// if (!switcher_active) {
 		if (!wsp) {
-			keyUp('Alt_L');
+			getWindow();
+			// keyUp('Alt_L');
 			changeWS(-1);
 		}
 	}
@@ -456,13 +517,17 @@ function four_finger_down() {
 
 function four_finger_up() {
 	if (wm_mode) {
-
+		getWindow();
+		changeWS(1, true);
+	} else if (wm_mode_tiling) {
+		pressKey(['Escape']);
 	} else {
 		if (wsp) {
 			// pressKey(['w']);
 			wsp._closeWindow(wsp._selectedIndex);
 		} else {
-			keyUp('Alt_L');
+			// keyUp('Alt_L');
+			getWindow();
 			changeWS(1);
 		}
 	}
@@ -480,6 +545,13 @@ function changeFullscreen(win, state) {
 			} else {
 				win.unmake_fullscreen();
 			}
+	}
+}
+
+function pinch_two_start() {
+	getWindow();
+	if (active_win == 'Evince') {
+		
 	}
 }
 
@@ -524,9 +596,79 @@ function pinch_three_in() {
 	Main.overview.toggle();
 };
 
+function pinch_three_out() {
+	getWindow();
+	if (get_wmclass() == 'firefox' &&
+		/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())
+	) {
+		log('video site in FF detected - going fullscreen');
+		doFocusing();
+		pressKey(['f']);
+		switchWinBack();
+	} else if (!active_win.get_maximized()) {
+		active_win.maximize(Meta.MaximizeFlags.BOTH);
+	} else if (!active_win.is_fullscreen()) {
+		if (get_wmclass() == 'Evince') {
+			pressKey(['w']);
+		} else {
+			changeFullscreen(active_win, true);
+		}
+	}
+	active_win = restore_win = null;
+}
+
+function pinch_four_out() {
+	getWindow();
+	doFocusing();
+	switch (get_wmclass()) {
+		case 'Evince':
+			pressKey(['d']);
+			break;
+		default:
+			pressKey(['Alt_L', 'Right']);
+			break;
+	}
+	// switchWinBack();
+}
+
+function pinch_four_in() {
+	getWindow();
+	doFocusing();
+	switch (get_wmclass()) {
+		case 'Evince':
+			pressKey(['F9']);
+			break;
+		default:
+			pressKey(['Alt_L', 'Left']);
+			break;
+	}
+	// switchWinBack();
+}
+
+function pinch_four_end() {
+	switchWinBack();
+}
+
 // Clutter.init(null);
 // Clutter.main();
 
+let FUNS = {};
+['three', 'four'].forEach(num => {
+	['up', 'down', 'left', 'right', 'begin', 'end', 'hold'].forEach(dir => {
+		const name = `${num}_finger_${dir}`;
+		try {
+			FUNS[name] = eval(name);
+		} catch (ReferenceError) {};
+	});
+});
+['two', 'three', 'four'].forEach(num => {
+	['in', 'out', 'start', 'end'].forEach(dir => {
+		const name = `pinch_${num}_${dir}`;
+		try {
+			FUNS[name] = eval(name);
+		} catch (ReferenceError) {};
+	});
+});
 
 function cb(pipe, res) {
 	// dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
@@ -538,7 +680,7 @@ function line_reader(dis, res) {
 	const [out, length] = dis.read_line_finish(res);
 	if (length > 0) {
 		input = stdinDecoder.decode(out).trim();
-		print(`> ${input}`);
+		log(`> ${input}`);
 		handle_input(input);
 		dis.read_line_async(0, null, line_reader);
 	} else {
@@ -548,7 +690,7 @@ function line_reader(dis, res) {
 
 function handle_input(cmd) {
 	if (cmd in FUNS) {
-		print('executing!');
+		// print(`executing! (t = ${Date.now()})`);
 		try {
 			FUNS[cmd]();
 		} catch (e) {
@@ -565,6 +707,7 @@ let input;
 let dis;
 
 let _virtualKeyboard;
+let _virtualTouchpad;
 const PIPE_PATH = `${GLib.getenv('XDG_RUNTIME_DIR')}/fusuma_fifo`;
 let tracker;
 
@@ -577,6 +720,9 @@ export default class FusumaServerExtension {
 		const seat = Clutter.get_default_backend().get_default_seat();
 		_virtualKeyboard = seat.create_virtual_device(
 			Clutter.InputDeviceType.KEYBOARD_DEVICE
+		);
+		_virtualTouchpad = seat.create_virtual_device(
+			Clutter.InputDeviceType.POINTER_DEVICE
 		);
 		tracker = Shell.WindowTracker.get_default();
 		// global.stage.connect('key-press-event', (self, event) => (log('key event')));
@@ -601,4 +747,5 @@ export default class FusumaServerExtension {
 
     }
 }
+
 
