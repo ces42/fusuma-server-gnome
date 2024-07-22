@@ -9,7 +9,8 @@ import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';
 
 const stdinDecoder = new TextDecoder('utf-8');
 
-const log = console.log;
+// const log = console.log;
+const log = (_) => {};
 
 
 function findPointerWindow() {
@@ -36,13 +37,16 @@ function findPointerWindow() {
 }
 
 function pressKey(combination) {
-	// if (typeof combination === 'string') {
-	// 	combination = [combination];
-	// }
+	if (typeof combination === 'string') {
+		combination = [combination];
+	}
 	log('pressing ' + combination.join('+'))
+	combination = combination.map(key =>
+		key + ( /^(Control|Alt|Shift|Super)$/.test(key) ? '_L' : '' )
+	)
 	combination.forEach(key => {
 		const KEY = Clutter[`KEY_${key}`];
-		if (!KEY) log(`unknow key "${KEY}"`)
+		if (!KEY) log(`unknow key "${key}"`)
 		_virtualKeyboard.notify_keyval(
 			Clutter.get_current_event_time(), KEY, Clutter.KeyState.PRESSED
 		)
@@ -310,13 +314,13 @@ function three_finger_right() {
 	switch (get_wmclass()) {
 		case "Spotify":
 			// ydotool()
-			pressKey(['AudioNext']);
+			pressKey(['AudioPrev']);
 			break;
 		case "Evince":
 			evinceTab(-1);
 			break;
 		case "gnome-calendar":
-			pressKey(['Prior']);
+			pressKey(['Alt_L', 'Left']);
 			break;
 		default:
 			pressKey(['Control_L', 'Prior']);
@@ -328,13 +332,13 @@ function three_finger_left() {
 	switch (get_wmclass()) {
 		case "Spotify":
 			// ydotool()
-			pressKey(['AudioPrev']);
+			pressKey(['AudioNext']);
 			break;
 		case "Evince":
 			evinceTab(1);
 			break;
 		case "gnome-calendar":
-			pressKey(['Next']);
+			pressKey(['Alt_L', 'Right']);
 			break;
 		default:
 			pressKey(['Control_L', 'Next']);
@@ -423,7 +427,7 @@ function three_finger_down() {
 			maximizeWin(active_win);
 			break;
 		default:
-			pressKey(['Control_L', 'T']);
+			pressKey(['Control_L', 't']);
 			break;
 	}
 	restore_win = active_win;
@@ -555,7 +559,7 @@ function pinch_two_start() {
 	}
 }
 
-const NEVER_PINCH_APPS = new Set(['Evince', 'Xournalpp', 'Eog']);
+const NEVER_PINCH_APPS = new Set(['Evince', 'Xournalpp', 'Eog', 'libreoffice-writer']);
 function pinch_two_in() {
 	getWindow();
 	if (!active_win || NEVER_PINCH_APPS.has(get_wmclass())) {
@@ -609,7 +613,9 @@ function pinch_three_out() {
 		active_win.maximize(Meta.MaximizeFlags.BOTH);
 	} else if (!active_win.is_fullscreen()) {
 		if (get_wmclass() == 'Evince') {
+			doFocusing();
 			pressKey(['w']);
+			switchWinBack();
 		} else {
 			changeFullscreen(active_win, true);
 		}
@@ -740,6 +746,13 @@ export default class FusumaServerExtension {
    //          //     id = '-1';
    //          // }
    //      });
+
+		return;
+        var ModeType = Shell.hasOwnProperty('ActionMode') ?
+            Shell.ActionMode : Shell.KeyBindingMode;
+		Main.wm.addKeybinding(
+			''
+		)
 
     }
 
