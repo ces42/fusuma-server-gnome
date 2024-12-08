@@ -254,9 +254,12 @@ function altTabFinish() {
 	// keyUp('Alt_L');
 	// switcher_active = false
 	if (wsp) {
-		wsp._finish();
-		// wsp.destroy(); //_finish() already destroys
-		wsp = null;
+		try {
+			wsp._finish();
+		} finally {
+			// wsp.destroy(); //_finish() already destroys
+			wsp = null;
+		}
 	}
 }
 
@@ -559,7 +562,7 @@ function pinch_two_start() {
 	}
 }
 
-const NEVER_PINCH_APPS = new Set(['Evince', 'Xournalpp', 'Eog', 'libreoffice-writer']);
+const NEVER_PINCH_APPS = new Set(['Evince', 'Xournalpp', 'Eog', 'libreoffice-writer', 'Zathura']);
 function pinch_two_in() {
 	getWindow();
 	if (!active_win || NEVER_PINCH_APPS.has(get_wmclass())) {
