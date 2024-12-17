@@ -361,6 +361,7 @@ function three_finger_up() {
 			pressKey(['Control_L', 'W']);
 			break;
 		case "firefox":
+		case "org.mozilla.firefox":
 		case "firefox-aurora":
 		case "Tor Browser":
 		case "Chromium-browser":
@@ -413,6 +414,7 @@ function three_finger_down() {
 			restore_win = active_win;
 			break;
 		case "firefox":
+		case "org.mozilla.firefox":
 		case "firefox-aurora":
 		case "Tor Browser":
 		case "Chromium-browser":
@@ -572,7 +574,9 @@ function pinch_two_in() {
 	
 	if (active_win.is_fullscreen()) {
 		changeFullscreen(active_win, false);
-	} else if (active_win.get_maximized() && get_wmclass() != 'firefox') {
+	} else if (active_win.get_maximized()
+		   && get_wmclass() != 'firefox'
+		   && get_wmclass() != 'org.mozilla.firefox') {
 		active_win.unmaximize(Meta.MaximizeFlags.BOTH);
 	}
 	active_win = restore_win = null;
@@ -585,7 +589,8 @@ function pinch_two_out() {
 		return;
 	}
 
-	if (get_wmclass() == 'firefox') {
+	let wmclass = get_wmclass()
+	if (wmclass == 'firefox' || wmclass == 'org.mozilla.firefox' ) {
 		// if (/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())) {
 		// 	log('video site in FF detected - going fullscreen');
 		// 	pressKey(['Control_L', '0']);
@@ -605,7 +610,8 @@ function pinch_three_in() {
 
 function pinch_three_out() {
 	getWindow();
-	if (get_wmclass() == 'firefox' &&
+	let wmclass = get_wmclass()
+	if ((wmclass == 'firefox' || wmclass == 'org.mozilla.firefox') &&
 		/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())
 	) {
 		log('video site in FF detected - going fullscreen');
