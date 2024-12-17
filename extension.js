@@ -197,7 +197,7 @@ function three_finger_end() {
 	}
 	if (esp) {
 		evinceTabFinish();
-		if (restore_win.get_wm_class() == "Evince") {
+		if (restore_win.get_wm_class().endsWith("Evince")) {
 			active_win = restore_win = null
 			return;
 		}
@@ -320,6 +320,7 @@ function three_finger_right() {
 			pressKey(['AudioPrev']);
 			break;
 		case "Evince":
+		case 'org.gnome.Evince':
 			evinceTab(-1);
 			break;
 		case "gnome-calendar":
@@ -338,6 +339,7 @@ function three_finger_left() {
 			pressKey(['AudioNext']);
 			break;
 		case "Evince":
+		case 'org.gnome.Evince':
 			evinceTab(1);
 			break;
 		case "gnome-calendar":
@@ -382,6 +384,7 @@ function three_finger_up() {
 			}
 			break;
 		case "Evince":
+		case 'org.gnome.Evince':
 			if (esp) {
 				pressKey(['W']);
 			} else {
@@ -429,6 +432,7 @@ function three_finger_down() {
 			restore_win = active_win;
 			break;
 		case "Evince":
+		case 'org.gnome.Evince':
 			maximizeWin(active_win);
 			break;
 		default:
@@ -559,15 +563,16 @@ function changeFullscreen(win, state) {
 
 function pinch_two_start() {
 	getWindow();
-	if (active_win == 'Evince') {
-		
+	if (active_win.endsWith('Evince')) {
+		// unfinished
 	}
 }
 
-const NEVER_PINCH_APPS = new Set(['Evince', 'Xournalpp', 'Eog', 'libreoffice-writer', 'Zathura']);
+const NEVER_PINCH_APPS = new Set(['Evince', 'org.gnome.Evine', 'Xournalpp', 'Eog', 'libreoffice-writer', 'Zathura']);
 function pinch_two_in() {
 	getWindow();
-	if (!active_win || NEVER_PINCH_APPS.has(get_wmclass())) {
+	let wmclass = get_wmclass();
+	if (!active_win || NEVER_PINCH_APPS.has(wmclass)) {
 		active_win = restore_win = null;
 		return;
 	}
@@ -575,8 +580,7 @@ function pinch_two_in() {
 	if (active_win.is_fullscreen()) {
 		changeFullscreen(active_win, false);
 	} else if (active_win.get_maximized()
-		   && get_wmclass() != 'firefox'
-		   && get_wmclass() != 'org.mozilla.firefox') {
+		   && wmclass.endsWith('firefox')) {
 		active_win.unmaximize(Meta.MaximizeFlags.BOTH);
 	}
 	active_win = restore_win = null;
@@ -584,13 +588,13 @@ function pinch_two_in() {
 
 function pinch_two_out() {
 	getWindow();
-	if (!active_win || NEVER_PINCH_APPS.has(get_wmclass())) {
+	let wmclass = get_wmclass();
+	if (!active_win || NEVER_PINCH_APPS.has(wmclass)) {
 		active_win = restore_win = null;
 		return;
 	}
 
-	let wmclass = get_wmclass()
-	if (wmclass == 'firefox' || wmclass == 'org.mozilla.firefox' ) {
+	if (wmclass.endsWith('firefox')) {
 		// if (/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())) {
 		// 	log('video site in FF detected - going fullscreen');
 		// 	pressKey(['Control_L', '0']);
@@ -611,7 +615,7 @@ function pinch_three_in() {
 function pinch_three_out() {
 	getWindow();
 	let wmclass = get_wmclass()
-	if ((wmclass == 'firefox' || wmclass == 'org.mozilla.firefox') &&
+	if ((wmclass.endsWith('firefox')) &&
 		/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())
 	) {
 		log('video site in FF detected - going fullscreen');
@@ -621,7 +625,7 @@ function pinch_three_out() {
 	} else if (!active_win.get_maximized()) {
 		active_win.maximize(Meta.MaximizeFlags.BOTH);
 	} else if (!active_win.is_fullscreen()) {
-		if (get_wmclass() == 'Evince') {
+		if (wmclass.endsWith('Evince')) {
 			doFocusing();
 			pressKey(['w']);
 			switchWinBack();
@@ -637,6 +641,7 @@ function pinch_four_out() {
 	doFocusing();
 	switch (get_wmclass()) {
 		case 'Evince':
+		case 'org.gnome.Evince':
 			pressKey(['d']);
 			break;
 		default:
@@ -651,6 +656,7 @@ function pinch_four_in() {
 	doFocusing();
 	switch (get_wmclass()) {
 		case 'Evince':
+		case 'org.gnome.Evince':
 			pressKey(['F9']);
 			break;
 		default:
