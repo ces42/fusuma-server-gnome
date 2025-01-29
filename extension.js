@@ -9,8 +9,8 @@ import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';
 
 const stdinDecoder = new TextDecoder('utf-8');
 
-// const log = console.log;
-const log = (_) => {};
+const log = console.log;
+//const log = (_) => {};
 
 
 function findPointerWindow() {
@@ -143,7 +143,7 @@ let restore_win;
 
 function getWindow() {
 	restore_win = global.display.get_focus_window();
-	if (restore_win && restore_win.get_wm_class() == 'Guake') {
+	if (restore_win && restore_win.get_wm_class() == 'guake') {
 		active_win = restore_win;
 	} else {
 		active_win = findPointerWindow() || restore_win;
@@ -174,7 +174,10 @@ function switchWinBack() {
 }
 
 function get_wmclass() {
-	return (active_win || global.display.get_focus_window())?.get_wm_class() || 'root'
+	let wmclass = (active_win || global.display.get_focus_window())
+			?.get_wm_class()
+		|| 'root'
+	return /[^.]*$/.exec(wmclass.toLowerCase())[0]
 }
 
 function get_title() {
@@ -197,7 +200,7 @@ function three_finger_end() {
 	}
 	if (esp) {
 		evinceTabFinish();
-		if (restore_win.get_wm_class().endsWith("Evince")) {
+		if (restore_win.get_wm_class().endsWith("evince")) {
 			active_win = restore_win = null
 			return;
 		}
@@ -306,24 +309,26 @@ function evinceTabFinish() {
 	// keyUp('Alt_L');
 	// switcher_active = false
 	if (esp) {
-		esp._finish();
-		// esp.destroy(); //_finish() already destroys
-		esp = null;
+		try {
+			esp._finish();
+		} finally {
+			// esp.destroy(); //_finish() already destroys
+			esp = null;
+		}
 	}
 }
 
 
 function three_finger_right() {
 	switch (get_wmclass()) {
-		case "Spotify":
+		case "spotify":
 			// ydotool()
 			pressKey(['AudioPrev']);
 			break;
-		case "Evince":
-		case 'org.gnome.Evince':
+		case "evince":
 			evinceTab(-1);
 			break;
-		case "gnome-calendar":
+		case "calendar":
 			pressKey(['Alt_L', 'Left']);
 			break;
 		default:
@@ -334,15 +339,14 @@ function three_finger_right() {
 
 function three_finger_left() {
 	switch (get_wmclass()) {
-		case "Spotify":
+		case "spotify":
 			// ydotool()
 			pressKey(['AudioNext']);
 			break;
-		case "Evince":
-		case 'org.gnome.Evince':
+		case "evince":
 			evinceTab(1);
 			break;
-		case "gnome-calendar":
+		case "calendar":
 			pressKey(['Alt_L', 'Right']);
 			break;
 		default:
@@ -358,15 +362,14 @@ function three_finger_up() {
 		return;
 	}
 	switch (get_wmclass()) {
-		case "Tilix":
-		case "Guake":
+		case "tilix":
+		case "guake":
 			pressKey(['Control_L', 'W']);
 			break;
 		case "firefox":
-		case "org.mozilla.firefox":
 		case "firefox-aurora":
-		case "Tor Browser":
-		case "Chromium-browser":
+		case "tor browser":
+		case "chromium-browser":
 			pressKey(['Control_L', 'F4']);
 			break;
 		case "kitty":
@@ -383,8 +386,7 @@ function three_finger_up() {
 				pressKey(['Control_L', 'F4']);
 			}
 			break;
-		case "Evince":
-		case 'org.gnome.Evince':
+		case "evince":
 			if (esp) {
 				pressKey(['W']);
 			} else {
@@ -406,21 +408,20 @@ function three_finger_down() {
 		return;
 	}
 	switch (get_wmclass()) {
-		case "Tilix":
-		case "Guake":
+		case "tilix":
+		case "guake":
 		case "kitty":
 			pressKey(['Control_L', 'T']);
 			restore_win = active_win;
 			break;
-		case "TeXstudio":
+		case "texstudio":
 			pressKey(['Control_L', 'n']);
 			restore_win = active_win;
 			break;
 		case "firefox":
-		case "org.mozilla.firefox":
 		case "firefox-aurora":
-		case "Tor Browser":
-		case "Chromium-browser":
+		case "tor browser":
+		case "chromium-browser":
 			if (ff_newtab >= 0 && Date.now() - ff_newtab < 800) {
 				pressKey(['Control_L', 'F4']);
 				pressKey(['Control_L', 'T']);
@@ -431,8 +432,7 @@ function three_finger_down() {
 			}
 			restore_win = active_win;
 			break;
-		case "Evince":
-		case 'org.gnome.Evince':
+		case "evince":
 			maximizeWin(active_win);
 			break;
 		default:
@@ -563,12 +563,12 @@ function changeFullscreen(win, state) {
 
 function pinch_two_start() {
 	getWindow();
-	if (active_win.endsWith('Evince')) {
+	if (active_win.get_wmclass().endsWith('evince')) {
 		// unfinished
 	}
 }
 
-const NEVER_PINCH_APPS = new Set(['Evince', 'org.gnome.Evine', 'Xournalpp', 'Eog', 'libreoffice-writer', 'Zathura']);
+const NEVER_PINCH_APPS = new Set(['firefox', 'evince', 'xournalpp', 'loupe', 'eog', 'libreoffice-writer', 'zathura']);
 function pinch_two_in() {
 	getWindow();
 	let wmclass = get_wmclass();
@@ -580,7 +580,7 @@ function pinch_two_in() {
 	if (active_win.is_fullscreen()) {
 		changeFullscreen(active_win, false);
 	} else if (active_win.get_maximized()
-		   && wmclass.endsWith('firefox')) {
+		   && wmclass == 'firefox') {
 		active_win.unmaximize(Meta.MaximizeFlags.BOTH);
 	}
 	active_win = restore_win = null;
@@ -594,7 +594,7 @@ function pinch_two_out() {
 		return;
 	}
 
-	if (wmclass.endsWith('firefox')) {
+	if (wmclass == 'firefox') {
 		// if (/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())) {
 		// 	log('video site in FF detected - going fullscreen');
 		// 	pressKey(['Control_L', '0']);
@@ -615,7 +615,7 @@ function pinch_three_in() {
 function pinch_three_out() {
 	getWindow();
 	let wmclass = get_wmclass()
-	if ((wmclass.endsWith('firefox')) &&
+	if ((wmclass == 'firefox') &&
 		/(FMovies|YouTube|odysee|tagesschau\.de|prime video|Picture-in-Picture)/.test(get_title())
 	) {
 		log('video site in FF detected - going fullscreen');
@@ -625,7 +625,7 @@ function pinch_three_out() {
 	} else if (!active_win.get_maximized()) {
 		active_win.maximize(Meta.MaximizeFlags.BOTH);
 	} else if (!active_win.is_fullscreen()) {
-		if (wmclass.endsWith('Evince')) {
+		if (wmclass == 'evince') {
 			doFocusing();
 			pressKey(['w']);
 			switchWinBack();
@@ -640,8 +640,7 @@ function pinch_four_out() {
 	getWindow();
 	doFocusing();
 	switch (get_wmclass()) {
-		case 'Evince':
-		case 'org.gnome.Evince':
+		case 'evince':
 			pressKey(['d']);
 			break;
 		default:
@@ -655,8 +654,7 @@ function pinch_four_in() {
 	getWindow();
 	doFocusing();
 	switch (get_wmclass()) {
-		case 'Evince':
-		case 'org.gnome.Evince':
+		case 'evince':
 			pressKey(['F9']);
 			break;
 		default:
@@ -697,16 +695,24 @@ function cb(pipe, res) {
 	dis.read_line_async(0, null, line_reader);
 };
 
-function line_reader(dis, res) {
-	const [out, length] = dis.read_line_finish(res);
-	if (length > 0) {
-		input = stdinDecoder.decode(out).trim();
-		log(`> ${input}`);
-		handle_input(input);
-		dis.read_line_async(0, null, line_reader);
-	} else {
-		Clutter.main_quit();
-	};
+function line_reader(stream, res) {
+	try {
+		const [out, length] = stream.read_line_finish(res);
+		if (length > 0) {
+			input = stdinDecoder.decode(out).trim();
+			log(`> ${input}`);
+			handle_input(input);
+		} else {
+			log('read empty line form pipe');
+		}
+		stream.read_line_async(0, null, line_reader);
+	} catch (e) {
+		if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+			log("Read operation was cancelled");
+		} else {
+			log(`Error reading from stream: ${e.message}`);
+		}
+	}
 };
 
 function handle_input(cmd) {
