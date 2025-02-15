@@ -200,7 +200,7 @@ function three_finger_end() {
 	}
 	if (esp) {
 		evinceTabFinish();
-		if (restore_win.get_wm_class().endsWith("evince")) {
+		if (restore_win.get_wm_class().toLowerCase().endsWith("evince")) {
 			active_win = restore_win = null
 			return;
 		}
@@ -308,13 +308,11 @@ function evinceTab(move) {
 function evinceTabFinish() {
 	// keyUp('Alt_L');
 	// switcher_active = false
-	if (esp) {
-		try {
-			esp._finish();
-		} finally {
-			// esp.destroy(); //_finish() already destroys
-			esp = null;
-		}
+	try {
+		esp._finish();
+	} finally {
+		// esp.destroy(); //_finish() already destroys
+		esp = null;
 	}
 }
 
@@ -325,9 +323,9 @@ function three_finger_right() {
 			// ydotool()
 			pressKey(['AudioPrev']);
 			break;
-		case "evince":
-			evinceTab(-1);
-			break;
+		//case "evince":
+		//	evinceTab(-1);
+		//	break;
 		case "calendar":
 			pressKey(['Alt_L', 'Left']);
 			break;
@@ -343,9 +341,9 @@ function three_finger_left() {
 			// ydotool()
 			pressKey(['AudioNext']);
 			break;
-		case "evince":
-			evinceTab(1);
-			break;
+		//case "evince":
+		//	evinceTab(1);
+		//	break;
 		case "calendar":
 			pressKey(['Alt_L', 'Right']);
 			break;
@@ -689,31 +687,6 @@ let FUNS = {};
 	});
 });
 
-function cb(pipe, res) {
-	// dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
-	dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
-	dis.read_line_async(0, null, line_reader);
-};
-
-function line_reader(stream, res) {
-	try {
-		const [out, length] = stream.read_line_finish(res);
-		if (length > 0) {
-			input = stdinDecoder.decode(out).trim();
-			log(`> ${input}`);
-			handle_input(input);
-		} else {
-			log('read empty line form pipe');
-		}
-		stream.read_line_async(0, null, line_reader);
-	} catch (e) {
-		if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
-			log("Read operation was cancelled");
-		} else {
-			log(`Error reading from stream: ${e.message}`);
-		}
-	}
-};
 
 function handle_input(cmd) {
 	if (cmd in FUNS) {
@@ -742,7 +715,14 @@ export default class FusumaServerExtension {
     enable() {
 		pipe = Gio.File.new_for_path(PIPE_PATH)
 		keep_open = pipe.open_readwrite(null);
-		pipe.read_async(0, null, cb);
+
+		this.cancellable = new Gio.Cancellable();
+		pipe.read_async(GLib.PRIORITY_DEFAULT, this.cancellable,
+			(pipe, res) => {
+				dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
+				dis.read_line_async(GLib.PRIORITY_DEFAULT, this.cancellable, this.line_reader.bind(this));
+			}
+		);
 
 		const seat = Clutter.get_default_backend().get_default_seat();
 		_virtualKeyboard = seat.create_virtual_device(
@@ -774,11 +754,39 @@ export default class FusumaServerExtension {
 		Main.wm.addKeybinding(
 			''
 		)
-
     }
 
-    disable() {
+	//cb(pipe, res) {
+	//	// dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
+	//	dis = new Gio.DataInputStream({ base_stream: pipe.read_finish(res) });
+	//	dis.read_line_async(GLib.PRIORITY_DEFAULT, this.cancellable, this.line_reader);
+	//};
 
+
+	line_reader(stream, res) {
+		try {
+			const [out, length] = stream.read_line_finish(res);
+			if (length > 0) {
+				input = stdinDecoder.decode(out).trim();
+				log(`> ${input}`);
+				handle_input(input);
+			} else {
+				log('read empty line form pipe');
+			}
+			stream.read_line_async(GLib.PRIORITY_DEFAULT, this.cancellable, this.line_reader.bind(this));
+		} catch (e) {
+			if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED)) {
+				log("Read operation was cancelled");
+			} else {
+				log(`Error reading from stream: ${e.message}`);
+			}
+		}
+	};
+
+    disable() {
+		this.cancellable.cancel();
+		if (wsp)
+			wsp._finish();
     }
 }
 
