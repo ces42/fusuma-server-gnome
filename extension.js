@@ -9,7 +9,7 @@ import * as AltTab from 'resource:///org/gnome/shell/ui/altTab.js';
 
 const stdinDecoder = new TextDecoder('utf-8');
 
-const log = console.log;
+const log =  (s) => {console.log("fusuma-gnome: " + s);};
 //const log = (_) => {};
 
 
