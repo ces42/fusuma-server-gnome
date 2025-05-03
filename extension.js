@@ -126,7 +126,7 @@ function _changeWS_gnome(move, move_win) { // int move is how much to move by
 		action = 'move'
 	}
 	Main.wm._showWorkspaceSwitcher(
-		global.display, active_win, new DummyKeyBinding(`${action}---${dir}`)
+		global.display, null, active_win, new DummyKeyBinding(`${action}---${dir}`)
 	);
 }
 
